@@ -2,6 +2,7 @@
 import time
 
 from .backend import create_display
+from .diagnostics import report_invalid
 from .config import ConfigStore
 from .noctalia import locked_status
 from .palette import PaletteStore
@@ -17,7 +18,7 @@ def make_display():
     return create_display()
 
 
-def run(path, duration, palette_path=None):
+def run(path, duration=None, palette_path=None):
     """Return frame count; close the display even if opening or streaming fails."""
     store = ConfigStore(path)
     palette = PaletteStore(palette_path) if palette_path else None
@@ -25,12 +26,13 @@ def run(path, duration, palette_path=None):
     cpu = sample_cpu()
     start = clock.monotonic()
     count = 0
+    reported = None
     locked = True
     epoch = start
     next_status = start
     try:
         display.open()
-        deadline = start + duration
+        deadline = start + duration if duration is not None else float('inf')
         next_frame = start
         while True:
             now = clock.monotonic()
@@ -47,6 +49,12 @@ def run(path, duration, palette_path=None):
                 clock.sleep(min(next_frame - now, next_status - now, deadline - now))
                 continue
             store.poll()
+            if store.error:
+                if store.failed_revision != reported:
+                    report_invalid(store.error)
+                    reported = store.failed_revision
+            else:
+                reported = None
             config = store.current
             assert config is not None
             entry = Sequencer(config.locked if locked else config.normal).at(now - epoch)

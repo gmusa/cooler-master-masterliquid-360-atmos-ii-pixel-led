@@ -1,5 +1,6 @@
-"""Bounded, USB-free local preview."""
+"""CLI for USB-free preview, bounded live runs, and persistent service mode."""
 import argparse
+import signal
 import sys
 
 from .config import ConfigError, ConfigStore
@@ -7,9 +8,13 @@ from .pipeline import Sequencer, render_frame
 from .widgets import registry
 
 
+def _stop_service(_signum, _frame):
+    raise KeyboardInterrupt
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='pixel-dashboard')
-    parser.add_argument('mode', choices=['preview', 'live'])
+    parser.add_argument('mode', choices=['preview', 'live', 'serve'])
     parser.add_argument('--config', required=True)
     parser.add_argument('--frames', type=int, default=10)
     parser.add_argument('--output')
@@ -18,16 +23,30 @@ def main(argv=None):
     parser.add_argument('--palette', help='explicit generated Noctalia palette TOML path')
     parser.add_argument('--trace', action='store_true', help='print logical frame time and widget')
     args = parser.parse_args(argv)
-    if args.mode == 'live':
-        if args.output is not None or args.duration is None or not 0 < args.duration <= 3600:
+    if args.mode in ('live', 'serve'):
+        if args.mode == 'live' and (args.output is not None or args.duration is None or not 0 < args.duration <= 3600):
             parser.error('live requires --duration between 0 and 3600 and no --output')
+        if args.mode == 'serve' and (args.output is not None or args.duration is not None):
+            parser.error('serve requires no --duration or --output')
         try:
             from .live import run
-            run(args.config, args.duration, args.palette)
+            previous = None
+            if args.mode == 'serve':
+                previous = signal.getsignal(signal.SIGTERM)
+                signal.signal(signal.SIGTERM, _stop_service)
+            try:
+                try:
+                    run(args.config, args.duration, args.palette)
+                except KeyboardInterrupt:
+                    if args.mode != 'serve':
+                        raise
+            finally:
+                if previous is not None:
+                    signal.signal(signal.SIGTERM, previous)
         except (ConfigError, ValueError) as exc:
             parser.error(str(exc))
         except (OSError, RuntimeError, ImportError) as exc:
-            print(f'pixel-dashboard live: {exc}', file=sys.stderr)
+            print(f'pixel-dashboard {args.mode}: {exc}', file=sys.stderr)
             return 1
         return 0
     if args.output is None or args.duration is not None:

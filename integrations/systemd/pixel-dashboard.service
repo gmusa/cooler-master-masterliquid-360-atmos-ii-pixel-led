@@ -1,0 +1,12 @@
+[Unit]
+Description=Pixel dashboard USB display
+
+[Service]
+Type=simple
+WorkingDirectory=%h/cm-pixel
+ExecStart=%h/cm-pixel/.venv/bin/pixel-dashboard serve --config %h/.config/pixel-dashboard/config.toml --palette %h/.config/pixel-dashboard/palette.toml
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

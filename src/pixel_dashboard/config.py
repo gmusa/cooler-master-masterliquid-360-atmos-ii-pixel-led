@@ -92,6 +92,7 @@ class ConfigStore:
         self.current = None
         self.error = None
         self._seen = None
+        self.failed_revision = None
         if not self.reload():
             raise ConfigError(self.error)
 
@@ -107,7 +108,13 @@ class ConfigStore:
             signature = (after.st_mtime_ns, after.st_size)
         except (OSError, ValueError) as exc:
             self.error = str(exc)
+            try:
+                stat = self.path.stat()
+                self.failed_revision = (stat.st_mtime_ns, stat.st_size)
+            except OSError:
+                self.failed_revision = ('missing', self.error)
             return False
+        self.failed_revision = None
         self.current = candidate
         self._seen = signature
         self.error = None
@@ -120,6 +127,7 @@ class ConfigStore:
             signature = (stat.st_mtime_ns, stat.st_size)
         except OSError as exc:
             self.error = str(exc)
+            self.failed_revision = ('missing', self.error)
             return False
         if signature == self._seen:
             return False
