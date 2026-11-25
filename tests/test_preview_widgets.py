@@ -3,7 +3,7 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageSequence
+from PIL import Image, ImageSequence
 
 from pixel_dashboard.config import parse_config
 from pixel_dashboard.pipeline import Sequencer, render_frame
@@ -216,6 +216,84 @@ def test_cli_uses_upstream_led_topology(tmp_path, monkeypatch):
         assert gif.convert('RGB').getpixel((0, 0)) != (0, 0, 0)
 
 
+def test_cli_hex_layout_preserves_widget_pixels(tmp_path):
+    path = tmp_path / 'config.toml'
+    output = tmp_path / 'layout.gif'
+    for name in ('cpu', 'gpu', 'date'):
+        for rotation in (0, 90, 180, 270):
+            frames = []
+            for masked in (False, True):
+                config = f'''[defaults]
+duration = 1
+brightness = 100
+rotation = {rotation}
+fps = 10
+mask = {str(masked).lower()}
+[normal]
+[[normal.widgets]]
+name = "{name}"
+[locked]
+[[locked.widgets]]
+name = "{name}"
+'''
+                path.write_text(config)
+                result = subprocess.run([sys.executable, '-m', 'pixel_dashboard', 'preview',
+                                         '--config', str(path), '--frames', '1', '--output', str(output)],
+                                        capture_output=True, text=True, timeout=10)
+                assert (result.returncode, result.stdout, result.stderr) == (0, '1 frames rendered\n', '')
+                with Image.open(output) as gif:
+                    frames.append(gif.convert('RGB').copy())
+            before, after = ({(x, y) for y in range(32) for x in range(32)
+                              if frame.getpixel((x, y)) != (0, 0, 0)} for frame in frames)
+            assert before and before == after, (name, rotation, len(before - after))
+
+
+def test_hex_boundary_metrics_and_palette_survive_all_rotations():
+    from datetime import datetime
+
+    palette = {'primary': '#ff8cb3', 'on_surface': '#ffe0eb', 'secondary': '#ffb3cc'}
+    options = parse_config(CONFIG).normal.widgets[1].options
+    date = registry['date']().render({}, datetime(2026, 12, 31).timestamp(), palette)
+    other_date = registry['date']().render({}, datetime(2026, 1, 1).timestamp(), palette)
+    assert date.tobytes() != other_date.tobytes()
+
+    cases = [('date', date)]
+    for name in ('cpu', 'gpu'):
+        widget = registry[name]()
+        temperature_lines = []
+        for temperature in (-99, 999, 1000):
+            image = widget.render({'temperature': temperature, 'usage': 100}, 0, palette)
+            bar_color = (255, 140, 179)
+            for top, bottom in ((8, 13), (14, 19), (20, 24)):
+                assert any(pixel != (0, 0, 0) for pixel in image.crop((8, top, 24, bottom)).getdata()), (name, temperature, top)
+            assert all(image.getpixel((x, 25)) == bar_color for x in range(10, 22))
+            temperature_lines.append(image.crop((8, 14, 24, 19)).tobytes())
+            cases.append((f'{name} {temperature}C 100%', image))
+        assert len(set(temperature_lines)) == 3, name
+
+    for label, image in cases:
+        source = {(x, y) for y in range(32) for x in range(32)
+                  if image.getpixel((x, y)) != (0, 0, 0)}
+        assert source, label
+        colors = {image.getpixel((x, y)) for y in range(32) for x in range(32)}
+        # Small scaled fonts are antialiased, so their pixels are blends of the
+        # on_surface role rather than necessarily its exact RGB value.
+        text_pixels = {color for color in colors if color != (0, 0, 0) and
+                       color[0] >= color[2] >= color[1] and color[1] > color[0] * 0.8}
+        assert text_pixels, label
+        if label != 'date':
+            assert (255, 140, 179) in colors
+        for rotation in (0, 90, 180, 270):
+            full = render_frame(image, replace(options, rotation=rotation, brightness=100, mask=False))
+            masked = render_frame(image, replace(options, rotation=rotation, brightness=100, mask=True))
+            before = {(x, y) for y in range(32) for x in range(32)
+                      if full.getpixel((x, y)) != (0, 0, 0)}
+            after = {(x, y) for y in range(32) for x in range(32)
+                     if masked.getpixel((x, y)) != (0, 0, 0)}
+            assert before == after and len(before) == len(source), (label, rotation, len(before - after))
+            assert {masked.getpixel((x, y)) for x, y in after} == {image.getpixel((x, y)) for x, y in source}
+
+
 def test_cli_sensor_metrics_are_visible(tmp_path):
     path = tmp_path / 'config.toml'
     output = tmp_path / 'metrics.gif'
@@ -227,17 +305,13 @@ def test_cli_sensor_metrics_are_visible(tmp_path):
         assert (result.returncode, result.stderr) == (0, '')
         with Image.open(output) as gif:
             actual = gif.convert('RGB')
-        expected = Image.new('RGB', (32, 32))
-        draw = ImageDraw.Draw(expected)
-        draw.text((2, 1), name.upper(), fill='white')
-        draw.text((2, 10), '60C', fill='white')
-        draw.text((2, 19), '--' if name == 'cpu' else '70%', fill='white')
-        for box in ((2, 1, 30, 9), (2, 10, 30, 18), (2, 19, 30, 27)):
-            assert actual.crop(box).tobytes() == expected.crop(box).tobytes(), (name, box, [
-                (x, y, actual.getpixel((x, y)), expected.getpixel((x, y)))
-                for y in range(box[1], box[3]) for x in range(box[0], box[2])
-                if actual.getpixel((x, y)) != expected.getpixel((x, y))][:8])
-        assert actual.crop((2, 28, 30, 32)).getbbox() is not None
+        for box in ((9, 8, 23, 13), (9, 14, 23, 19), (9, 20, 23, 24)):
+            assert actual.crop(box).getbbox() is not None, (name, box)
+        assert actual.crop((10, 24, 22, 26)).getbbox() is not None
+        # Preview CPU has temperature but no usage; GPU has both metrics.
+        assert actual.getpixel((11, 25)) != (0, 0, 0)
+        assert actual.getpixel((18, 25)) == (0, 0, 0)
+        assert (actual.getpixel((17, 25)) != (0, 0, 0)) == (name == 'gpu')
 
 
 def test_cli_preview_bounded_no_usb(tmp_path):

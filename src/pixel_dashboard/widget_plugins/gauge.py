@@ -1,5 +1,5 @@
 """Shared sensor gauge rendering."""
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 
 class Gauge:
@@ -12,15 +12,22 @@ class Gauge:
         temperature = data.get('temperature')
         usage = data.get('usage')
         text_color = palette['on_surface'] if palette else 'white'
-        draw.text((2, 1), self.label, fill=text_color)
-        draw.text((2, 10), f'{round(temperature)}C' if temperature is not None else '--', fill=text_color)
-        draw.text((2, 19), f'{round(usage)}%' if usage is not None else '--', fill=text_color)
+        font = ImageFont.load_default(size=6)
+        for y, text in ((6, self.label),
+                        (12, f'{round(temperature)}C' if temperature is not None else '--'),
+                        (18, f'{round(usage)}%' if usage is not None else '--')):
+            box = draw.textbbox((0, 0), text, font=font)
+            draw.text(((32 - (box[2] - box[0])) // 2 - box[0], y), text,
+                      font=font, fill=text_color)
         # Prefer actual utilization; otherwise display the available temperature
         # as a 0–100 scale. Empty outline means neither measurement is present.
         value = usage if usage is not None else temperature
-        draw.rectangle((2, 28, 29, 31), outline=palette['primary'] if palette else self.color)
+        bar_color = palette['primary'] if palette else self.color
+        draw.line((10, 24, 21, 24), fill=bar_color)
+        draw.point((10, 25), fill=bar_color)
+        draw.point((21, 25), fill=bar_color)
         if value is not None:
-            width = max(0, min(26, round(float(value) * 26 / 100)))
+            width = max(0, min(10, round(float(value) * 10 / 100)))
             if width:
-                draw.rectangle((3, 29, 2 + width, 30), fill=palette['primary'] if palette else self.color)
+                draw.line((11, 25, 10 + width, 25), fill=bar_color)
         return image
