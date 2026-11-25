@@ -1,4 +1,4 @@
-import pytest
+import pytest  # pyright: ignore[reportMissingImports] (host test runner)
 
 from pixel_dashboard import backend, live
 from pixel_dashboard.__main__ import main
@@ -36,6 +36,81 @@ class Display:
 
     def close(self):
         self.closed += 1
+
+
+def test_live_selected_animation_continues_and_wraps(tmp_path, monkeypatch):
+    import cmpixel.animations
+    import numpy as np
+
+    config = tmp_path / 'config.toml'
+    config.write_text('''[defaults]
+duration = 0.2
+fps = 10
+brightness = 100
+mask = false
+[normal]
+[[normal.widgets]]
+name = "animation"
+animation = "plasma"
+[locked]
+[[locked.widgets]]
+name = "clock"
+''')
+    starts = []
+    def frames():
+        starts.append(True)
+        for value in (30, 90):
+            yield np.full((32, 32, 3), (value, 20, 10), dtype=np.uint8)
+    monkeypatch.setitem(cmpixel.animations.ANIMATIONS, 'plasma', frames)
+    tick, display = Clock(), Display()
+    monkeypatch.setattr(live, 'clock', tick)
+    monkeypatch.setattr(live, 'make_display', lambda: display)
+    monkeypatch.setattr(live, 'locked_status', lambda: False)
+    assert main(['live', '--config', str(config), '--duration', '.5']) == 0
+    assert [frame.getpixel((16, 16)) for frame in display.frames] == [
+        (30, 20, 10), (90, 20, 10), (30, 20, 10), (90, 20, 10), (30, 20, 10)]
+    assert len(starts) == 3
+
+
+def test_live_selected_animation_restarts_on_valid_equal_config_reload(tmp_path, monkeypatch):
+    import cmpixel.animations
+    import numpy as np
+
+    config = tmp_path / 'config.toml'
+    config.write_text('''[defaults]
+duration = 1
+fps = 10
+brightness = 100
+mask = false
+[normal]
+[[normal.widgets]]
+name = "animation"
+animation = "plasma"
+[locked]
+[[locked.widgets]]
+name = "clock"
+''')
+    starts = []
+    def frames():
+        starts.append(True)
+        for value in (30, 90, 150, 210):
+            yield np.full((32, 32, 3), (value, 20, 10), dtype=np.uint8)
+    monkeypatch.setitem(cmpixel.animations.ANIMATIONS, 'plasma', frames)
+
+    class ReloadClock(Clock):
+        def sleep(self, delay):
+            super().sleep(delay)
+            if len(self.sleeps) == 2:
+                config.write_text(config.read_text() + '# valid reload\n')
+
+    tick, display = ReloadClock(), Display()
+    monkeypatch.setattr(live, 'clock', tick)
+    monkeypatch.setattr(live, 'make_display', lambda: display)
+    monkeypatch.setattr(live, 'locked_status', lambda: False)
+    assert main(['live', '--config', str(config), '--duration', '.4']) == 0
+    assert [frame.getpixel((16, 16)) for frame in display.frames] == [
+        (30, 20, 10), (90, 20, 10), (30, 20, 10), (90, 20, 10)]
+    assert (len(starts), display.opened, display.closed) == (2, 1, 1)
 
 
 def test_live_public_cli_frames_and_ownership(tmp_path, monkeypatch, capsys):

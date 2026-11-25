@@ -21,6 +21,7 @@ class Options:
 class Entry:
     name: str
     options: Options
+    animation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,9 @@ class Config:
 
 FIELDS = {'duration', 'brightness', 'rotation', 'fps', 'mask'}
 NAMES = {'clock', 'date', 'cpu', 'gpu', 'animation'}
+ANIMATIONS = frozenset(('plasma', 'rainbow', 'swirl', 'ripple', 'breathe', 'sparkle', 'fire',
+                        'starfield', 'tunnel', 'metaballs', 'matrix', 'fireworks', 'aurora',
+                        'comet', 'pinwheel', 'bounce', 'interference', 'twinkle', 'rubik'))
 
 
 def _options(data, base):
@@ -80,7 +84,14 @@ def parse_config(text):
         for widget in widgets:
             if not isinstance(widget, dict) or widget.get('name') not in NAMES:
                 raise ConfigError('unknown widget')
-            entries.append(Entry(widget['name'], _options({k: v for k, v in widget.items() if k != 'name'}, options)))
+            animation = widget.get('animation')
+            if 'animation' in widget:
+                if widget['name'] != 'animation':
+                    raise ConfigError('unknown option')
+                if type(animation) is not str or animation not in ANIMATIONS:
+                    raise ConfigError('invalid animation')
+            entries.append(Entry(widget['name'], _options({k: v for k, v in widget.items()
+                                                          if k not in ('name', 'animation')}, options), animation))
         return Playlist(tuple(entries))
 
     return Config(playlist('normal'), playlist('locked'))

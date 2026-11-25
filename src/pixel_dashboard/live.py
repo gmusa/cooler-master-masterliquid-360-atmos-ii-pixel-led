@@ -8,6 +8,7 @@ from .noctalia import locked_status
 from .palette import PaletteStore
 from .pipeline import Sequencer, render_frame
 from .sensors import CpuSampler, sample_gpu
+from .widget_plugins.animation import AnimationPlayback
 from .widgets import registry
 
 clock = time
@@ -30,6 +31,7 @@ def run(path, duration=None, palette_path=None):
     locked = True
     epoch = start
     next_status = start
+    playback = AnimationPlayback()
     try:
         display.open()
         deadline = start + duration if duration is not None else float('inf')
@@ -57,17 +59,21 @@ def run(path, duration=None, palette_path=None):
                 reported = None
             config = store.current
             assert config is not None
-            entry, phase = Sequencer(config.locked if locked else config.normal).at_phase(now - epoch)
+            sequencer = Sequencer(config.locked if locked else config.normal)
+            entry, phase = sequencer.at_phase(now - epoch)
             sample = (cpu() if entry.name == 'cpu' else
                       sample_gpu() if entry.name == 'gpu' else None)
             data = vars(sample) if sample is not None else {}
             render_time = clock.time() if entry.name in ('clock', 'date') else now - start
             colors = palette.poll() if palette else None
-            widget = registry[entry.name]()
-            if entry.name in ('cpu', 'gpu'):
-                image = widget.render(data, render_time, colors, phase=phase, duration=entry.options.duration)
-            else:
-                image = widget.render(data, render_time, colors) if colors else widget.render(data, render_time)
+            image = playback.render(config, entry, phase, (epoch, int((now - epoch) // sequencer.period)),
+                                    data, render_time, colors)
+            if image is None:
+                widget = registry[entry.name]()
+                if entry.name in ('cpu', 'gpu'):
+                    image = widget.render(data, render_time, colors, phase=phase, duration=entry.options.duration)
+                else:
+                    image = widget.render(data, render_time, colors) if colors else widget.render(data, render_time)
             display.send_image(render_frame(image, entry.options))
             count += 1
             next_frame = now + 1 / entry.options.fps

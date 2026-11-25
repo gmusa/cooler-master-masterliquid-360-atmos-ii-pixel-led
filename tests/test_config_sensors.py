@@ -1,6 +1,6 @@
 import json
 
-import pytest
+import pytest  # pyright: ignore[reportMissingImports] (host test runner)
 
 from pixel_dashboard.config import ConfigError, ConfigStore, parse_config
 from pixel_dashboard.sensors import CpuSampler, parse_cpu, parse_gpu
@@ -27,6 +27,27 @@ name = "date"
 [[locked.widgets]]
 name = "animation"
 '''
+
+
+def test_animation_selector_names_and_last_good(tmp_path):
+    names = ('plasma', 'rainbow', 'swirl', 'ripple', 'breathe', 'sparkle', 'fire', 'starfield',
+             'tunnel', 'metaballs', 'matrix', 'fireworks', 'aurora', 'comet', 'pinwheel',
+             'bounce', 'interference', 'twinkle', 'rubik')
+    for name in names:
+        cfg = parse_config(CONFIG.replace('name = "animation"', f'name = "animation"\nanimation = "{name}"'))
+        assert cfg.locked.widgets[1].animation == name
+    assert parse_config(CONFIG).locked.widgets[1].animation is None
+    path = tmp_path / 'config.toml'
+    path.write_text(CONFIG)
+    store = ConfigStore(path)
+    original = store.current
+    for text, error in ((CONFIG.replace('name = "clock"', 'name = "clock"\nanimation = "plasma"'),
+                         'unknown option'),
+                        (CONFIG.replace('name = "animation"', 'name = "animation"\nanimation = "unknown"'),
+                         'invalid animation')):
+        path.write_text(text)
+        assert store.poll() is False
+        assert store.current is original and store.error == error
 
 
 def test_order_and_inheritance():

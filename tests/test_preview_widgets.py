@@ -33,6 +33,41 @@ name = "animation"
 '''
 
 
+def test_preview_selected_animation_continues_and_wraps(tmp_path, monkeypatch):
+    import cmpixel.animations
+    import numpy as np
+
+    from pixel_dashboard.__main__ import main
+
+    starts = []
+    def frames():
+        starts.append(True)
+        for value in (30, 90, 150):
+            yield np.full((32, 32, 3), (value, 20, 10), dtype=np.uint8)
+
+    monkeypatch.setitem(cmpixel.animations.ANIMATIONS, 'plasma', frames)
+    config = tmp_path / 'config.toml'
+    config.write_text('''[defaults]
+duration = 0.2
+fps = 10
+brightness = 100
+mask = false
+[normal]
+[[normal.widgets]]
+name = "animation"
+animation = "plasma"
+[locked]
+[[locked.widgets]]
+name = "clock"
+''')
+    output = tmp_path / 'effect.gif'
+    assert main(['preview', '--config', str(config), '--frames', '5', '--output', str(output)]) == 0
+    with Image.open(output) as gif:
+        assert [frame.convert('RGB').getpixel((16, 16)) for frame in ImageSequence.Iterator(gif)] == [
+            (30, 20, 10), (90, 20, 10), (30, 20, 10), (90, 20, 10), (30, 20, 10)]
+    assert len(starts) == 3
+
+
 def test_time_selection_and_option_effects():
     cfg = parse_config(CONFIG)
     seq = Sequencer(cfg.normal)

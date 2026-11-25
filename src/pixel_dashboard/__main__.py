@@ -5,6 +5,7 @@ import sys
 
 from .config import ConfigError, ConfigStore
 from .pipeline import Sequencer, render_frame
+from .widget_plugins.animation import AnimationPlayback
 from .widgets import registry
 
 
@@ -63,12 +64,14 @@ def main(argv=None):
     delays = []
     traces = []
     seconds = 0.0
+    playback = AnimationPlayback()
     for index in range(args.frames):
         store.poll()
         config = store.current
         assert config is not None  # constructor requires an initial valid config
         playlist = config.locked if args.locked else config.normal
-        entry, phase = Sequencer(playlist).at_phase(seconds)
+        sequencer = Sequencer(playlist)
+        entry, phase = sequencer.at_phase(seconds)
         # GIF stores each frame delay in a 16-bit centisecond field.
         if entry.options.fps < 0.01:
             parser.error('invalid fps')
@@ -76,11 +79,13 @@ def main(argv=None):
         sample = ({'temperature': 60} if entry.name == 'cpu' else
                   {'temperature': 60, 'usage': 70} if entry.name == 'gpu' else {})
         colors = palette.poll() if palette else None
-        widget = registry[entry.name]()
-        if entry.name in ('cpu', 'gpu'):
-            image = widget.render(sample, seconds, colors, phase=phase, duration=entry.options.duration)
-        else:
-            image = widget.render(sample, seconds, colors) if colors else widget.render(sample, seconds)
+        image = playback.render(config, entry, phase, int(seconds // sequencer.period), sample, seconds, colors)
+        if image is None:
+            widget = registry[entry.name]()
+            if entry.name in ('cpu', 'gpu'):
+                image = widget.render(sample, seconds, colors, phase=phase, duration=entry.options.duration)
+            else:
+                image = widget.render(sample, seconds, colors) if colors else widget.render(sample, seconds)
         frame = render_frame(image, entry.options)
         if args.frames > 1:
             frame = frame.convert('RGBA')
