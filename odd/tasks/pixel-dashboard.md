@@ -23,9 +23,9 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 - T1 [S1–S14] — Record requirements, current palette, architectural direction and uncertainties; route: inline, documentation only; commit: `500b02e`.
 - T2 [S1, S3, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commits: `500b02e`, `837ebe7`.
-- T3 [S1, S3, S10] — Connect real CPU/GPU samples, CPU utilization and one live USB frame owner to the tested widget sequence; route: scoped worker under context backstop; commit: pending.
+- T3 [S1, S3, S10] — Connect real CPU/GPU samples, CPU utilization and one live USB frame owner to the tested widget sequence; route: scoped worker under context backstop; commit: `74b481d`.
 - T4 [S9] — Proposed v2 configuration GUI, separately scoped after v1; route: deferred; commit: none.
-- T5 [S2, S4, S7, S12] — Integrate Noctalia v5 template palette and locked/unlocked transitions with startup state reconciliation; route: inline after T3; commit: pending.
+- T5 [S2, S4, S7, S12] — Integrate Noctalia v5 template palette and locked/unlocked transitions with startup state reconciliation; route: scoped worker under context backstop after T3; commit: pending.
 - T6 [S5–S6] — Persistent validated hot reload, error feedback and restartable user service; route: inline after T3/T5, with separately authorized installation outside repo; commit: pending.
 
 ## Design notes
@@ -91,3 +91,5 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
   User subsequently approved read-only local inspection of `/proc/stat` for CPU use and `/home/gmusa/.config/noctalia/` for integration location. This did not authorize writes under those paths.
 - L10 — Read-only discovery: Noctalia local config currently contains `settings.json`, `colors.json`, `palettes/rose2.json` and `user-templates.toml` (commented examples). Hooks in `settings.json` are disabled; active palette `custom rose2`/`dark` was independently reported by Noctalia IPC. Avoid writing generated or legacy JSON files; verify installed v5.6.0 template behavior before any config integration. CPU usage `/proc/stat` is cumulative and needs two readings, not a single absolute reading. No outside-root writes.
+- L11 — T3 committed locally as `74b481d` (`feat(live): stream sampled dashboard frames through hidraw`). 34 tests passed. An offline temporary installation of this package with `cm-pixel==0.1.0` drove the actual `2516:021c` frame HID interface for five seconds at 15% software brightness with CPU/GPU widgets, exit 0. Physical visual legibility was not observed by the agent; pump/fans and firmware were not addressed. Independent verifier confirmed source/fake-test logic but could not run USB in its read-only scope. No push.
+- L12 — User authorized new Noctalia fragment `/home/gmusa/.config/noctalia/pixel-dashboard.toml` and generated palette `/home/gmusa/.config/pixel-dashboard/palette.toml`, both confirmed absent first. A standalone v5.6 fragment passed `noctalia config validate` exit 0; creating it and invoking `noctalia msg config-reload` returned `ok` and generated the exact palette file without a broad `templates-apply`. IPC still reported `custom rose2`, `dark`; generated roles parsed as primary `#ff8cb3`, on_surface `#ffe0eb`, secondary `#ffb3cc`. No existing Noctalia JSON was intentionally edited. No service installed or push.

@@ -1,0 +1,4 @@
+[colors]
+primary = "{{ colors.primary.default.hex }}"
+on_surface = "{{ colors.on_surface.default.hex }}"
+secondary = "{{ colors.secondary.default.hex }}"

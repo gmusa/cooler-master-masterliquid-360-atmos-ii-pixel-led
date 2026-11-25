@@ -14,7 +14,8 @@ def main(argv=None):
     parser.add_argument('--frames', type=int, default=10)
     parser.add_argument('--output')
     parser.add_argument('--duration', type=float)
-    parser.add_argument('--locked', action='store_true')
+    parser.add_argument('--locked', action='store_true', help='preview the locked playlist')
+    parser.add_argument('--palette', help='explicit generated Noctalia palette TOML path')
     parser.add_argument('--trace', action='store_true', help='print logical frame time and widget')
     args = parser.parse_args(argv)
     if args.mode == 'live':
@@ -22,8 +23,8 @@ def main(argv=None):
             parser.error('live requires --duration between 0 and 3600 and no --output')
         try:
             from .live import run
-            run(args.config, args.duration)
-        except ConfigError as exc:
+            run(args.config, args.duration, args.palette)
+        except (ConfigError, ValueError) as exc:
             parser.error(str(exc))
         except (OSError, RuntimeError, ImportError) as exc:
             print(f'pixel-dashboard live: {exc}', file=sys.stderr)
@@ -35,7 +36,9 @@ def main(argv=None):
         parser.error('frames must be between 1 and 300')
     try:
         store = ConfigStore(args.config)
-    except ConfigError as exc:
+        from .palette import PaletteStore
+        palette = PaletteStore(args.palette) if args.palette else None
+    except (ConfigError, ValueError) as exc:
         parser.error(str(exc))
     images = []
     delays = []
@@ -53,7 +56,9 @@ def main(argv=None):
         # Synthetic sample for the demo only; no sensors or USB are opened.
         sample = ({'temperature': 60} if entry.name == 'cpu' else
                   {'temperature': 60, 'usage': 70} if entry.name == 'gpu' else {})
-        image = registry[entry.name]().render(sample, seconds)
+        colors = palette.poll() if palette else None
+        widget = registry[entry.name]()
+        image = widget.render(sample, seconds, colors) if colors else widget.render(sample, seconds)
         frame = render_frame(image, entry.options)
         if args.frames > 1:
             frame = frame.convert('RGBA')

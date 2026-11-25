@@ -1,0 +1,4 @@
+# Merge this fragment into Noctalia v5.6 config after choosing an output path.
+[theme.templates.user.pixel_dashboard]
+input_path = "/PATH/TO/cm-pixel/integrations/noctalia/palette.toml"
+output_path = "/CHOOSE/PRIVATE/WRITABLE/PATH/pixel-dashboard-palette.toml"
