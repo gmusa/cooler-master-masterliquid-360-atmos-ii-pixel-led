@@ -9,13 +9,28 @@ from .widgets import registry
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='pixel-dashboard')
-    parser.add_argument('mode', choices=['preview'])
+    parser.add_argument('mode', choices=['preview', 'live'])
     parser.add_argument('--config', required=True)
     parser.add_argument('--frames', type=int, default=10)
-    parser.add_argument('--output', required=True)
+    parser.add_argument('--output')
+    parser.add_argument('--duration', type=float)
     parser.add_argument('--locked', action='store_true')
     parser.add_argument('--trace', action='store_true', help='print logical frame time and widget')
     args = parser.parse_args(argv)
+    if args.mode == 'live':
+        if args.output is not None or args.duration is None or not 0 < args.duration <= 3600:
+            parser.error('live requires --duration between 0 and 3600 and no --output')
+        try:
+            from .live import run
+            run(args.config, args.duration)
+        except ConfigError as exc:
+            parser.error(str(exc))
+        except (OSError, RuntimeError, ImportError) as exc:
+            print(f'pixel-dashboard live: {exc}', file=sys.stderr)
+            return 1
+        return 0
+    if args.output is None or args.duration is not None:
+        parser.error('preview requires --output and no --duration')
     if not 1 <= args.frames <= 300:
         parser.error('frames must be between 1 and 300')
     try:

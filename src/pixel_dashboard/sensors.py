@@ -2,6 +2,7 @@
 import json
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,42 @@ def parse_gpu(text):
         return Sample(_number(parts[1]), _number(parts[2]))
     except StopIteration:
         return Sample()
+
+
+def _cpu_counters(text):
+    try:
+        fields = text.splitlines()[0].split()
+        if fields[0] != 'cpu' or len(fields) < 6:
+            return None
+        values = [int(value) for value in fields[1:]]
+        if any(value < 0 for value in values):
+            return None
+        return sum(values), values[3] + values[4]
+    except (IndexError, ValueError):
+        return None
+
+
+class CpuSampler:
+    """Read aggregate /proc/stat deltas; first and invalid samples have no usage."""
+
+    def __init__(self, read_stat=None, read_temperature=None):
+        self.read_stat = read_stat or (lambda: Path('/proc/stat').read_text())
+        self.read_temperature = read_temperature or (lambda: sample_cpu().temperature)
+        self.previous = None
+
+    def __call__(self):
+        try:
+            current = _cpu_counters(self.read_stat())
+        except OSError:
+            current = None
+        previous, self.previous = self.previous, current
+        usage = None
+        if previous is not None and current is not None:
+            total = current[0] - previous[0]
+            idle = current[1] - previous[1]
+            if total > 0 and 0 <= idle <= total:
+                usage = 100 * (total - idle) / total
+        return Sample(temperature=self.read_temperature(), usage=usage)
 
 
 def sample_cpu():

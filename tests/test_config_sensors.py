@@ -3,7 +3,7 @@ import json
 import pytest
 
 from pixel_dashboard.config import ConfigError, ConfigStore, parse_config
-from pixel_dashboard.sensors import parse_cpu, parse_gpu
+from pixel_dashboard.sensors import CpuSampler, parse_cpu, parse_gpu
 
 
 CONFIG = '''
@@ -101,6 +101,16 @@ def test_last_good_reload(tmp_path):
     assert store.current is not None
     assert store.current.normal.widgets[1].options.duration == 7
     assert store.error is None
+
+
+def test_cpu_delta_first_sample_and_invalid_delta():
+    readings = iter(['cpu  100 0 50 850 0 0 0 0 0 0\n',
+                     'cpu  130 0 70 900 0 0 0 0 0 0\n',
+                     'cpu  120 0 70 900 0 0 0 0 0 0\n'])
+    sampler = CpuSampler(read_stat=lambda: next(readings), read_temperature=lambda: 54.5)
+    assert sampler().usage is None
+    assert sampler().usage == 50
+    assert sampler().usage is None
 
 
 def test_sensor_partial_and_unavailable():
