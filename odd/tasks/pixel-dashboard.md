@@ -1,5 +1,5 @@
 # Pixel LED dashboard — ODD scope and design
-Status: rose-tinted surface palette generated and dashboard service running alongside a Wine HID opener; physical locked-clock and human color confirmation remain open. Noctalia GUI template view unresolved. Clone-local RDD disabled by L7; remote publication remains separate.
+Status: dashboard service running with rose-tinted surface palette; user confirms visible color improvement. Locked-clock legibility at 10% and Noctalia GUI template view remain unverified. Clone-local RDD disabled by L7; remote publication remains a separate user decision.
 Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 ## Specs
@@ -149,3 +149,8 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 > yo no puse ese regla, jajaja
 
   The earlier single-owner restriction in L31 was an assistant-imposed precaution, **not** a user requirement. Wine's `winedevice.exe` is part of a Steam/Proton runtime opened when the user launched a game; `fuser` showed an open HID handle but not any write to the LED. The parent stopped its background waiter, restarted only `pixel-dashboard.service` without touching Wine, and verified it active/running with PID 2732490, zero restarts and no recent service errors after two seconds, while both PID 2690841 (Wine) and 2732490 (dashboard) had the HID open. No claim of long-term collision-free device behavior is implied by this short check. Current user playlist parses and generated rose2 palette is primary `#ff3076`, on_surface `#ff84b0`, secondary `#ff578e`. User config, camera controls and Wine process remain untouched; pending human physical judgment of normal text and locked-clock readability. No push.
+- L33 — The human confirms the color improvement and asks to send remaining work to the repository and close today (verbatim):
+
+> si lo veo mejor , manda lo que falte al repo y cerramos por hoy
+
+  Normal-use text color now has human visual confirmation. The separate locked-clock legibility at user brightness 10% remains unverified because the camera comparison missed the display; do not claim it passed. The local branch `fix/noctalia-surface-contrast` contains the earlier dashboard and animation work as ancestors, has a clean worktree, and points at `origin` configured as `git@github.com-personal:gmusa/cooler-master-masterliquid-360-atmos-ii-pixel-led.git` (the user-specified personal host alias). Push only this current branch without force or PR, using that explicit host profile and not an ambient SSH agent/session; report the remote outcome separately. Service was active with PID 2732490, zero restarts at the last check. The human did not impose a single-HID-owner rule (L32).
