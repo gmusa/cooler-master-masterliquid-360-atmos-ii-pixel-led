@@ -1,0 +1,77 @@
+# Pixel LED dashboard — ODD scope and design
+Status: local first milestone authorized by L5; later milestones, service installation and remote publication remain separate.
+Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
+
+## Specs
+
+- S1 — “info de sensores ( cpu , gpu ) temperatura, velocidad , una animacion del uso , reloj digital / analogico , fecha”
+- S2 — “si la maquina esta loqueada que reprodusca una animacion ( podemos usar las del mismo cm-pixel, o estas de reloj que dije antes.”
+- S3 — “ver si los sensores podemos hacerle algun detalle visual para que no sea solo texto.”
+- S4 — “Uso noctalia v5 , estaria bueno respetar la paleta de colores activa de noctalia”
+- S5 — “ver que corra siempre y que se vuelva a iniciar si se cae el servicio.”
+- S6 — “la configuracion que tenga hot-reload y validacion ( noctalia suele mostrar un error en pantalla cuando hay error de config ) [yaml / toml ]”
+- S7 — “Estaria bueno poder armar la secuencia de widgets de info que ciclan en entorno normal. y los que cliclan en entorno locked”
+- S8 — “por cada widget estaria bueno poder definer su tiempo de ejecucion o uno general a nivel entorno ( locked / unlocked )”
+- S9 — “(v2) a futuro me gustaria tb tener un gui para configuirar todo esto de antes.”
+- S10 — “ademas de duration, que se puede definir por widget o global , brillo, rotacion , fps , mask.”
+- S11 — “Fijate que todo lo que armemos como widget sean modulos / plugins , para simplificar el mantenimiento si te parece.”
+- S12 — “Antes de arrancar decime que paleta encontras activa de noctalia. Por ahi es mejor definir un template de noctalia, en vez de leer que noctalia nos mande la config de colores.”
+- S13 — “hagamos un odd si queres para esto, pero si me gustaria que documentemos minimamente que vamos a hacer para que no perdamos contexto .”
+- S14 — “fijate que lo clonaste en carpeta separada. por ahi es mejor omitar la carpeta del repo cm-pixel es el root”
+
+## Tasks
+
+- T1 [S1–S14] — Record requirements, current palette, architectural direction and uncertainties; route: inline, documentation only; commit: with T2 first work unit.
+- T2 [S1, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commit: pending verification.
+- T3 [S2, S4–S5, S12] — Later v1 integration of Noctalia theme template and lock hooks, live USB ownership and systemd service; route: deferred beyond first milestone; commit: none.
+- T4 [S9] — Proposed v2 configuration GUI, separately scoped after v1; route: deferred; commit: none.
+
+## Design notes
+
+- Current Noctalia IPC reports palette `custom rose2`, resolved mode `dark`. This identifies the palette but not its hexadecimal values.
+- Prefer a Noctalia v5 theme template that renders resolved color roles into an application-owned palette file. Noctalia's documented template processing can refresh that file as the theme changes. Do not parse Noctalia's internal settings as the palette API. Source: https://docs.noctalia.dev/noctalia/v5.6.0/theming/templates/ .
+- Noctalia v5 documents `session_locked` and `session_unlocked` hooks after the compositor confirms lock transitions. Consider hooks for fast transitions plus a startup reconciliation of current lock state; validate the user's installed version before wiring anything. Source: https://docs.noctalia.dev/noctalia/v5.6.0/automation/hooks/ .
+- Proposed v1 shape: a single USB frame owner; a widget interface (`render(frame, sampled_data, palette, time)`) with independently maintained clock, date, CPU/GPU sensor, and animation modules; a sequencer with separate normal/locked playlists; per-widget overrides inheriting environment/global defaults for duration, brightness, rotation, FPS and mask. This is an architectural proposal, not a new requirement.
+- Configuration: propose TOML to match Noctalia's v5 ecosystem; parse and validate a complete candidate before swapping it in, retaining the last good configuration on failure. Define a usable diagnostic path before promising an on-screen error. Run as a user service with restart-on-failure only after lock, device ownership and lifecycle behavior are verified.
+- Sensor sources, GPU vendor/metrics, lock integration, image legibility on a 32×32 hexagonal grid, active palette values, and release/install packaging remain to be investigated before committing to implementation. Keep v2 GUI out of v1.
+- Local USB evidence: `2516:021c`, screen frame interface `/dev/hidraw5`; installed `cm-pixel 0.1.0` needed a local `hidraw` import instead of its default backend on this machine. That installed patch can be overwritten by reinstalling; design a reproducible dependency/backend arrangement before service deployment.
+- Local source implementation of T2 is authorized by L5. No SSH push, PR, service installation or external configuration changes are authorized by these notes.
+- Local discovery: Noctalia v5.6.0 reports `locked: false` via `noctalia msg status`. `sensors -j` exposes `k10temp-pci-00c3` → `Tctl` for CPU temperature; `nvidia-smi` exposes NVIDIA GeForce RTX 5070 temperature, utilization, fan speed and power. `asusec-isa-000a` reports `CPU_Opt` fan RPM as zero in this sample; don't promise a working fan-speed display. A `sensors -j` invocation also emitted an unreadable `temp4_input` diagnostic; tolerate partial readings. No extra outside-tree files were read directly.
+- For T2, keep hardware writes out of tests. Treat CPU utilization (`/proc/stat`) and the live installed hidraw backend as explicit later integration checks, rather than silently assuming they work.
+
+## Log
+
+- L1 — Original request (verbatim):
+
+> mira Lo que me gustaria es poder armar algo que haga ciclos de info
+>
+> - info de sensores ( cpu , gpu ) temperatura, velocidad , una animacion del uso , reloj digital / analogico , fecha
+> - si la maquina esta loqueada que reprodusca una animacion ( podemos usar las del mismo cm-pixel, o estas de reloj que dije antes.
+> - ver si los sensores podemos hacerle algun detalle visual para que no sea solo texto.
+> - Uso noctalia v5 , estaria bueno respetar la paleta de colores activa de noctalia
+> - ver que corra siempre y que se vuelva a iniciar si se cae el servicio.
+> - la configuracion que tenga hot-reload y validacion ( noctalia suele mostrar un error en pantalla cuando hay error de config ) [yaml / toml ]
+> - Estaria bueno poder armar la secuencia de widgets de info que ciclan en entorno normal. y los que cliclan en entorno locked
+> - por cada widget estaria bueno poder definer su tiempo de ejecucion o uno general a nivel entorno ( locked / unlocked )
+> - (v2) a futuro me gustaria tb tener un gui para configuirar todo esto de antes.
+>
+> el repo es git@github.com:gmusa/cooler-master-masterliquid-360-atmos-ii-pixel-led.git con host Host github.com-personal para usar mi cuenta personal ,
+
+- L2 — Additional requirements (verbatim):
+
+> ademas de duration, que se puede definir por widget o global , brillo, rotacion , fps , mask.
+>
+> Fijate que todo lo que armemos como widget sean modulos / plugins , para simplificar el mantenimiento si te parece.
+>
+> Antes de arrancar decime que paleta encontras activa de noctalia. Por ahi es mejor definir un template de noctalia, en vez de leer que noctalia nos mande la config de colores.
+>
+> hagamos un odd si queres para esto, pero si me gustaria que documentemos minimamente que vamos a hacer para que no perdamos contexto .
+
+- L3 — Repository root correction (verbatim):
+
+> fijate que lo clonaste en carpeta separada. por ahi es mejor omitar la carpeta del repo cm-pixel es el root
+
+- L4 — Evidence: cloning with `Host github.com-personal` succeeded without an ambient SSH agent. The remote repository is empty; `.git` was moved to `/home/gmusa/cm-pixel` after L3. No push occurred.
+- L5 — User accepted the proposed first local milestone (verbatim):
+
+> si dale
