@@ -68,7 +68,7 @@ def main(argv=None):
         config = store.current
         assert config is not None  # constructor requires an initial valid config
         playlist = config.locked if args.locked else config.normal
-        entry = Sequencer(playlist).at(seconds)
+        entry, phase = Sequencer(playlist).at_phase(seconds)
         # GIF stores each frame delay in a 16-bit centisecond field.
         if entry.options.fps < 0.01:
             parser.error('invalid fps')
@@ -77,7 +77,10 @@ def main(argv=None):
                   {'temperature': 60, 'usage': 70} if entry.name == 'gpu' else {})
         colors = palette.poll() if palette else None
         widget = registry[entry.name]()
-        image = widget.render(sample, seconds, colors) if colors else widget.render(sample, seconds)
+        if entry.name in ('cpu', 'gpu'):
+            image = widget.render(sample, seconds, colors, phase=phase, duration=entry.options.duration)
+        else:
+            image = widget.render(sample, seconds, colors) if colors else widget.render(sample, seconds)
         frame = render_frame(image, entry.options)
         if args.frames > 1:
             frame = frame.convert('RGBA')

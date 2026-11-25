@@ -6,28 +6,28 @@ class Gauge:
     color = 'orange'
     label = ''
 
-    def render(self, data, now, palette=None):
+    def render(self, data, now, palette=None, *, phase=0, duration=1):
         image = Image.new('RGB', (32, 32))
         draw = ImageDraw.Draw(image)
-        temperature = data.get('temperature')
-        usage = data.get('usage')
-        text_color = palette['on_surface'] if palette else 'white'
-        font = ImageFont.load_default(size=6)
-        for y, text in ((6, self.label),
-                        (12, f'{round(temperature)}C' if temperature is not None else '--'),
-                        (18, f'{round(usage)}%' if usage is not None else '--')):
+        usage_active = phase >= duration / 2
+        value = data.get('usage' if usage_active else 'temperature')
+        text = ('--' if value is None else
+                f'{round(value)}{"%" if usage_active else "C"}')
+        identity = palette['on_surface'] if palette else 'white'
+        text_color = (palette['secondary' if usage_active else 'primary'] if palette else self.color)
+        label_font = ImageFont.load_default(size=7)
+        label_box = draw.textbbox((0, 0), self.label, font=label_font)
+        draw.text(((32 - (label_box[2] - label_box[0])) // 2 - label_box[0], 5),
+                  self.label, font=label_font, fill=identity)
+        # Keep large readings inside the central square, even at extreme values.
+        font = ImageFont.load_default(size=7)
+        box = draw.textbbox((0, 0), text, font=font)
+        for size in range(13, 6, -1):
+            font = ImageFont.load_default(size=size)
             box = draw.textbbox((0, 0), text, font=font)
-            draw.text(((32 - (box[2] - box[0])) // 2 - box[0], y), text,
-                      font=font, fill=text_color)
-        # Prefer actual utilization; otherwise display the available temperature
-        # as a 0–100 scale. Empty outline means neither measurement is present.
-        value = usage if usage is not None else temperature
-        bar_color = palette['primary'] if palette else self.color
-        draw.line((10, 24, 21, 24), fill=bar_color)
-        draw.point((10, 25), fill=bar_color)
-        draw.point((21, 25), fill=bar_color)
-        if value is not None:
-            width = max(0, min(10, round(float(value) * 10 / 100)))
-            if width:
-                draw.line((11, 25, 10 + width, 25), fill=bar_color)
+            if box[2] - box[0] <= 24 and box[3] - box[1] <= 14:
+                break
+        draw.text(((32 - (box[2] - box[0])) // 2 - box[0],
+                   17 - (box[3] - box[1]) // 2 - box[1]), text,
+                  font=font, fill=text_color)
         return image

@@ -57,14 +57,17 @@ def run(path, duration=None, palette_path=None):
                 reported = None
             config = store.current
             assert config is not None
-            entry = Sequencer(config.locked if locked else config.normal).at(now - epoch)
+            entry, phase = Sequencer(config.locked if locked else config.normal).at_phase(now - epoch)
             sample = (cpu() if entry.name == 'cpu' else
                       sample_gpu() if entry.name == 'gpu' else None)
             data = vars(sample) if sample is not None else {}
             render_time = clock.time() if entry.name in ('clock', 'date') else now - start
             colors = palette.poll() if palette else None
             widget = registry[entry.name]()
-            image = widget.render(data, render_time, colors) if colors else widget.render(data, render_time)
+            if entry.name in ('cpu', 'gpu'):
+                image = widget.render(data, render_time, colors, phase=phase, duration=entry.options.duration)
+            else:
+                image = widget.render(data, render_time, colors) if colors else widget.render(data, render_time)
             display.send_image(render_frame(image, entry.options))
             count += 1
             next_frame = now + 1 / entry.options.fps

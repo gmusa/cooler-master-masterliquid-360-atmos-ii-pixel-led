@@ -10,14 +10,18 @@ class Sequencer:
         self.period = sum(entry.options.duration for entry in playlist.widgets)
 
     def at(self, seconds):
+        return self.at_phase(seconds)[0]
+
+    def at_phase(self, seconds):
+        """Return the active entry and elapsed seconds within that entry."""
         if seconds < 0:
             raise ValueError('time must be nonnegative')
         position = seconds % self.period
         for entry in self.playlist.widgets:
             if position < entry.options.duration:
-                return entry
+                return entry, position
             position -= entry.options.duration
-        return self.playlist.widgets[-1]
+        return self.playlist.widgets[-1], position
 
 
 def render_frame(image, options):

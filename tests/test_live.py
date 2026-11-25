@@ -52,6 +52,28 @@ def test_live_public_cli_frames_and_ownership(tmp_path, monkeypatch, capsys):
     assert capsys.readouterr().err == ''
 
 
+def test_live_sensor_entry_phase_public_cli(tmp_path, monkeypatch, capsys):
+    config = tmp_path / 'config.toml'
+    config.write_text(CONFIG.replace('name = "clock"', 'name = "cpu"')
+                      .replace('duration = 3', 'duration = 0.2')
+                      .replace('duration = 5', 'duration = 0.3'))
+    tick, display = Clock(), Display()
+    monkeypatch.setattr(live, 'clock', tick)
+    monkeypatch.setattr(live, 'make_display', lambda: display)
+    monkeypatch.setattr(live, 'locked_status', lambda: False)
+    monkeypatch.setattr(live, 'sample_cpu', lambda: lambda: Sample(54, None))
+    monkeypatch.setattr(live, 'sample_gpu', lambda: Sample(60, 100))
+    assert main(['live', '--config', str(config), '--duration', '1']) == 0
+    assert (display.opened, display.closed) == (1, 1)
+    assert capsys.readouterr().err == ''
+    assert len(display.frames) >= 10
+    def pixels(frame):
+        return frame.tobytes()
+    assert pixels(display.frames[0]) != pixels(display.frames[1])
+    assert pixels(display.frames[2]) != pixels(display.frames[4])
+    assert pixels(display.frames[0]) == pixels(display.frames[5])
+
+
 def test_live_clock_and_date_use_wall_time_public_cli(tmp_path, monkeypatch):
     config = tmp_path / 'config.toml'
     clock, display, seen = Clock(), Display(), []

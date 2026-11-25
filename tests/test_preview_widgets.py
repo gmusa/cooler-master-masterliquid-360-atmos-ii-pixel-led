@@ -37,6 +37,8 @@ def test_time_selection_and_option_effects():
     cfg = parse_config(CONFIG)
     seq = Sequencer(cfg.normal)
     assert [seq.at(t).name for t in (0, 2.99, 3, 7.99, 8)] == ['clock', 'clock', 'cpu', 'cpu', 'clock']
+    assert [(seq.at_phase(t)[0].name, seq.at_phase(t)[1]) for t in (3, 5.5, 7.99, 6)] == [
+        ('cpu', 0), ('cpu', 2.5), ('cpu', 4.99), ('cpu', 3)]
     entry = cfg.normal.widgets[1]
     source = Image.new('RGB', (32, 32))
     source.putpixel((0, 16), (200, 100, 0))
@@ -260,16 +262,18 @@ def test_hex_boundary_metrics_and_palette_survive_all_rotations():
     cases = [('date', date)]
     for name in ('cpu', 'gpu'):
         widget = registry[name]()
-        temperature_lines = []
+        temperature_images = []
         for temperature in (-99, 999, 1000):
             image = widget.render({'temperature': temperature, 'usage': 100}, 0, palette)
-            bar_color = (255, 140, 179)
-            for top, bottom in ((8, 13), (14, 19), (20, 24)):
-                assert any(pixel != (0, 0, 0) for pixel in image.crop((8, top, 24, bottom)).getdata()), (name, temperature, top)
-            assert all(image.getpixel((x, 25)) == bar_color for x in range(10, 22))
-            temperature_lines.append(image.crop((8, 14, 24, 19)).tobytes())
-            cases.append((f'{name} {temperature}C 100%', image))
-        assert len(set(temperature_lines)) == 3, name
+            assert image.crop((4, 10, 28, 25)).getbbox() is not None
+            temperature_images.append(image.tobytes())
+            cases.append((f'{name} {temperature}C', image))
+        assert len(set(temperature_images)) == 3, name
+        for data in ({'temperature': None, 'usage': None}, {'temperature': 60, 'usage': 100}):
+            for phase in (0, 0.5):
+                image = widget.render(data, 0, palette, phase=phase, duration=1)
+                assert image.crop((4, 10, 28, 25)).getbbox() is not None
+                cases.append((f'{name} {data} {phase}', image))
 
     for label, image in cases:
         source = {(x, y) for y in range(32) for x in range(32)
@@ -282,7 +286,7 @@ def test_hex_boundary_metrics_and_palette_survive_all_rotations():
                        color[0] >= color[2] >= color[1] and color[1] > color[0] * 0.8}
         assert text_pixels, label
         if label != 'date':
-            assert (255, 140, 179) in colors
+            assert any(r > b > g and r > 100 for r, g, b in colors)
         for rotation in (0, 90, 180, 270):
             full = render_frame(image, replace(options, rotation=rotation, brightness=100, mask=False))
             masked = render_frame(image, replace(options, rotation=rotation, brightness=100, mask=True))
@@ -292,6 +296,39 @@ def test_hex_boundary_metrics_and_palette_survive_all_rotations():
                      if masked.getpixel((x, y)) != (0, 0, 0)}
             assert before == after and len(before) == len(source), (label, rotation, len(before - after))
             assert {masked.getpixel((x, y)) for x, y in after} == {image.getpixel((x, y)) for x, y in source}
+
+
+def test_cli_entry_local_sensor_alternation(tmp_path):
+    path, output = tmp_path / 'config.toml', tmp_path / 'metrics.gif'
+    config = (CONFIG.replace('name = "clock"', 'name = "cpu"')
+              .replace('duration = 3', 'duration = 2').replace('name = "cpu"\nduration = 5', 'name = "gpu"\nduration = 3')
+              .replace('fps = 10', 'fps = 2'))
+    path.write_text(config)
+    result = subprocess.run([sys.executable, '-m', 'pixel_dashboard', 'preview', '--config', str(path),
+                             '--frames', '20', '--output', str(output), '--trace'],
+                            capture_output=True, text=True, timeout=10)
+    assert (result.returncode, result.stderr) == (0, '')
+    assert result.stdout.splitlines() == [f'{i / 2:.3f} {"cpu" if i % 10 < 4 else "gpu"}' for i in range(20)] + ['20 frames rendered']
+    with Image.open(output) as gif:
+        frames = [frame.convert('RGB').copy() for frame in ImageSequence.Iterator(gif)]
+    assert len(frames) == 20
+    for a, b in ((0, 10), (2, 12), (4, 14), (7, 17)):
+        assert frames[a].crop((1, 0, 32, 32)).tobytes() == frames[b].crop((1, 0, 32, 32)).tobytes()
+    assert frames[0].crop((1, 0, 32, 32)).tobytes() != frames[2].crop((1, 0, 32, 32)).tobytes()
+    assert frames[4].crop((1, 0, 32, 32)).tobytes() != frames[7].crop((1, 0, 32, 32)).tobytes()
+
+
+def test_sensor_palette_roles_change_with_phase():
+    palette = {'primary': '#ff8cb3', 'secondary': '#ffb3cc', 'on_surface': '#ffe0eb'}
+    for name in ('cpu', 'gpu'):
+        widget = registry[name]()
+        temperature = widget.render({'temperature': 60, 'usage': 70}, 0, palette, phase=0, duration=2)
+        usage = widget.render({'temperature': 60, 'usage': 70}, 0, palette, phase=1, duration=2)
+        assert temperature.crop((4, 12, 28, 25)).getbbox() is not None
+        assert usage.crop((4, 12, 28, 25)).getbbox() is not None
+        assert (255, 140, 179) in set(temperature.crop((4, 12, 28, 25)).getdata())
+        assert (255, 179, 204) in set(usage.crop((4, 12, 28, 25)).getdata())
+        assert temperature.crop((4, 4, 28, 11)).tobytes() == usage.crop((4, 4, 28, 11)).tobytes()
 
 
 def test_cli_sensor_metrics_are_visible(tmp_path):
@@ -305,13 +342,9 @@ def test_cli_sensor_metrics_are_visible(tmp_path):
         assert (result.returncode, result.stderr) == (0, '')
         with Image.open(output) as gif:
             actual = gif.convert('RGB')
-        for box in ((9, 8, 23, 13), (9, 14, 23, 19), (9, 20, 23, 24)):
-            assert actual.crop(box).getbbox() is not None, (name, box)
-        assert actual.crop((10, 24, 22, 26)).getbbox() is not None
-        # Preview CPU has temperature but no usage; GPU has both metrics.
-        assert actual.getpixel((11, 25)) != (0, 0, 0)
-        assert actual.getpixel((18, 25)) == (0, 0, 0)
-        assert (actual.getpixel((17, 25)) != (0, 0, 0)) == (name == 'gpu')
+        assert actual.crop((4, 4, 28, 11)).getbbox() is not None  # identity
+        assert actual.crop((4, 11, 28, 25)).getbbox() is not None  # one large reading
+        assert actual.crop((0, 25, 32, 32)).getbbox() is None
 
 
 def test_cli_preview_bounded_no_usb(tmp_path):
