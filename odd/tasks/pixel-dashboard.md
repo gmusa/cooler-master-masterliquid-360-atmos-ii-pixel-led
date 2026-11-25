@@ -1,5 +1,5 @@
 # Pixel LED dashboard — ODD scope and design
-Status: local first milestone authorized by L5; clone-local RDD disabled by L7. Later milestones, service installation and remote publication remain separate.
+Status: first local milestone verified in L8; clone-local RDD disabled by L7. Later milestones, service installation and remote publication remain separate.
 Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 ## Specs
@@ -22,7 +22,7 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 ## Tasks
 
 - T1 [S1–S14] — Record requirements, current palette, architectural direction and uncertainties; route: inline, documentation only; commit: `500b02e`.
-- T2 [S1, S3, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commit: first unit `500b02e`, second unit pending verification.
+- T2 [S1, S3, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commits: `500b02e`, `837ebe7`.
 - T3 [S1–S2, S4–S6, S12] — Later v1 integration of live sensor samples and CPU usage, Noctalia theme template and lock hooks, live USB ownership, persistent hot reload/error feedback, and systemd service; route: deferred beyond first milestone; commit: none.
 - T4 [S9] — Proposed v2 configuration GUI, separately scoped after v1; route: deferred; commit: none.
 
@@ -82,3 +82,4 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 > desactivemos el rdd para este clon y sigamos
 
   `gentle-ai review mode disable --scope clone` returned `off (decided by clone_local)`; global remained on. Prior lineage `review-a9147e557e8346c6` stopped at `escalated/targeted_validator_rejected` without approval. The change of mode is not a review approval.
+- L8 — Local first milestone: `837ebe7` added a bounded USB-free GIF preview, independently reviewed package/dependency risk (item 5), and passed 28 tests. A clean offline temporary install ran its packaged CLI and generated 3 GIF frames. A public 20-frame static example encoded exactly 20 frames; FPS `0.0001` exited 2 with `invalid fps` and no artifact. Upstream 556-LED membership was independently matched. The second work unit exceeds the approximate 400-line review target (536 additions plus 6 deletions) to keep its behavior, tests and docs together. No native review approval, service install or push.
