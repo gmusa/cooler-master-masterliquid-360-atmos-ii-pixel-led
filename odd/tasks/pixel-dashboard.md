@@ -1,5 +1,5 @@
 # Pixel LED dashboard — ODD scope and design
-Status: v1 implementation and user service verified locally through L15; compositor lock transitions and visual legibility remain unobserved. Clone-local RDD disabled by L7; remote publication remains separate.
+Status: v1 service active with hexagonal layout correction deployed through L19; visual legibility and compositor lock transitions await human observation. Clone-local RDD disabled by L7; remote publication remains separate.
 Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 ## Specs
@@ -28,8 +28,8 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 - T4 [S9] — Proposed v2 configuration GUI, separately scoped after v1; route: deferred; commit: none.
 - T5 [S2, S4, S7, S12] — Integrate Noctalia v5 template palette and locked/unlocked transitions with startup state reconciliation; route: scoped worker under context backstop after T3; commit: `7bea6b0`.
 - T6 [S5–S6] — Persistent validated hot reload, error feedback and restartable user service; route: scoped worker under context backstop after T3/T5; separately authorized installation outside repo by parent; commit: `adcfca4`.
-- T7 [S1, S3, S15] — Fit sensor and date text/bar within the LED hexagonal topology at 90° without clipping; route: scoped worker under context backstop; commit: pending.
-- T8 [S15] — Verify, deploy the widget correction to the running user service, and record physical limits; route: parent after T7; commit: pending.
+- T7 [S1, S3, S15] — Fit sensor and date text/bar within the LED hexagonal topology at 90° without clipping; route: scoped worker under context backstop; commit: `7a5d6ae`.
+- T8 [S15] — Verify, deploy the widget correction to the running user service, and record physical limits; route: parent after T7; correction commit: `7a5d6ae`; physical observation pending user feedback.
 
 ## Design notes
 
@@ -105,3 +105,5 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
   Reproduced with source widget images rendered through `render_frame` at 90° and the actual 556-LED mask: CPU 356 lit pixels before masking, 227 after (129 clipped); date 77 before, 76 after (one clipped). The service is currently active and owns `/dev/hidraw5`; tests and layout work must stay USB-free until a checked deployment. Engram memory remained unavailable, so this document is the continuity source.
 - L17 — T7: 45 tests passed; public CLI preview comparisons at all four rotations found zero pixels lost to the real mask for CPU/GPU/date. An independent verifier confirmed those tested values but requested boundary and palette evidence before deployment. A bounded parent check against the generated rose2 palette covered CPU/GPU usage 100%, temperatures -99, 999 and 1000, missing measurements, and all 365 calendar dates of 2026 at all four rotations (373 widget samples × 4); zero lit pixels were removed. A focused regression now covers boundary values, full bars, date 31/12 and palette in all rotations. The user's existing `/home/gmusa/.config/pixel-dashboard/config.toml` now has `rotation = 90` and `brightness = 50`; preserve these user edits during deployment rather than restoring the initial 15% setting. No physical USB write for this correction yet.
+- L18 — T7 committed as `7a5d6ae` (`fix(widgets): fit sensor and date text inside LED hexagon`), 137 authored changed lines. The user asked to be notified once this is installed on the real service; physical legibility requires their feedback, not an agent claim.
+- L19 — T8 deployed the corrected wheel offline into `/home/gmusa/cm-pixel/.venv` after stopping only `pixel-dashboard.service` and confirming `/dev/hidraw5` was free. A validated temporary backup of the prior installed package was retained until the upgrade passed, then removed. Installed `gauge.py` and `date.py` bytes equal source commit `7a5d6ae`; the unit validated and restarted. Its new process is active, enabled, zero restarts and sole `/dev/hidraw5` owner; the user TOML SHA-256 was identical before and after, preserving their `rotation = 90` and `brightness = 50`. The software path is installed and running, but human visual feedback on CPU/date legibility is still required. No push.
