@@ -1,5 +1,5 @@
 # Pixel LED dashboard — ODD scope and design
-Status: local first milestone authorized by L5; later milestones, service installation and remote publication remain separate.
+Status: local first milestone authorized by L5; clone-local RDD disabled by L7. Later milestones, service installation and remote publication remain separate.
 Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 ## Specs
@@ -21,9 +21,9 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 
 ## Tasks
 
-- T1 [S1–S14] — Record requirements, current palette, architectural direction and uncertainties; route: inline, documentation only; commit: with T2 first work unit.
-- T2 [S1, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commit: pending verification.
-- T3 [S2, S4–S5, S12] — Later v1 integration of Noctalia theme template and lock hooks, live USB ownership and systemd service; route: deferred beyond first milestone; commit: none.
+- T1 [S1–S14] — Record requirements, current palette, architectural direction and uncertainties; route: inline, documentation only; commit: `500b02e`.
+- T2 [S1, S3, S6–S8, S10–S11] — First local milestone: tested TOML validation and last-good reload, modular widgets, normal/locked playlists with inherited options, clock and CPU/GPU sensor samples, and a bounded demo; route: scoped worker under context backstop; commit: first unit `500b02e`, second unit pending verification.
+- T3 [S1–S2, S4–S6, S12] — Later v1 integration of live sensor samples and CPU usage, Noctalia theme template and lock hooks, live USB ownership, persistent hot reload/error feedback, and systemd service; route: deferred beyond first milestone; commit: none.
 - T4 [S9] — Proposed v2 configuration GUI, separately scoped after v1; route: deferred; commit: none.
 
 ## Design notes
@@ -37,7 +37,7 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 - Local USB evidence: `2516:021c`, screen frame interface `/dev/hidraw5`; installed `cm-pixel 0.1.0` needed a local `hidraw` import instead of its default backend on this machine. That installed patch can be overwritten by reinstalling; design a reproducible dependency/backend arrangement before service deployment.
 - Local source implementation of T2 is authorized by L5. No SSH push, PR, service installation or external configuration changes are authorized by these notes.
 - Local discovery: Noctalia v5.6.0 reports `locked: false` via `noctalia msg status`. `sensors -j` exposes `k10temp-pci-00c3` → `Tctl` for CPU temperature; `nvidia-smi` exposes NVIDIA GeForce RTX 5070 temperature, utilization, fan speed and power. `asusec-isa-000a` reports `CPU_Opt` fan RPM as zero in this sample; don't promise a working fan-speed display. A `sensors -j` invocation also emitted an unreadable `temp4_input` diagnostic; tolerate partial readings. No extra outside-tree files were read directly.
-- For T2, keep hardware writes out of tests. Treat CPU utilization (`/proc/stat`) and the live installed hidraw backend as explicit later integration checks, rather than silently assuming they work.
+- For T2, keep hardware writes out of tests. Treat CPU utilization (`/proc/stat`) and the live installed hidraw backend as explicit later integration checks, rather than silently assuming they work. T2's preview samples are synthetic; no live sensor-to-display loop, autonomous watcher, on-screen error or physical legibility has been proven.
 
 ## Log
 
@@ -75,3 +75,10 @@ Repository root: `/home/gmusa/cm-pixel`; branch: `feat/pixel-dashboard`.
 - L5 — User accepted the proposed first local milestone (verbatim):
 
 > si dale
+
+- L6 — First reviewable unit committed locally as `500b02e` (`feat(config): establish validated dashboard playlists and sensor adapters`); isolated staged checkout passed 15 config/sensor cases. No push. The remaining preview/widgets work is a separate unit; packaging CLI belongs with that unit to avoid a broken entry point.
+- L7 — User explicitly changed this clone's review mode and authorized continuing (verbatim):
+
+> desactivemos el rdd para este clon y sigamos
+
+  `gentle-ai review mode disable --scope clone` returned `off (decided by clone_local)`; global remained on. Prior lineage `review-a9147e557e8346c6` stopped at `escalated/targeted_validator_rejected` without approval. The change of mode is not a review approval.

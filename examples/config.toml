@@ -1,0 +1,25 @@
+[defaults]
+duration = 4
+brightness = 50
+rotation = 0
+fps = 10
+mask = true
+
+[normal]
+duration = 5
+[[normal.widgets]]
+name = "clock"
+[[normal.widgets]]
+name = "date"
+[[normal.widgets]]
+name = "cpu"
+[[normal.widgets]]
+name = "gpu"
+
+[locked]
+brightness = 20
+[[locked.widgets]]
+name = "animation"
+[[locked.widgets]]
+name = "clock"
+duration = 8

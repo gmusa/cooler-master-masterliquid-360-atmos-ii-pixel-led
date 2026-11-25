@@ -76,6 +76,17 @@ def test_poll_bad_then_good_without_thread(tmp_path):
     assert store.error is None
 
 
+def test_low_fps_reload_keeps_last_good_config(tmp_path):
+    path = tmp_path / 'config.toml'
+    path.write_text(CONFIG)
+    store = ConfigStore(path)
+    original = store.current
+    path.write_text(CONFIG.replace('fps = 10', 'fps = 0.0001'))
+    assert store.poll() is False
+    assert store.current is original
+    assert store.error == 'invalid fps'
+
+
 def test_last_good_reload(tmp_path):
     path = tmp_path / 'config.toml'
     path.write_text(CONFIG)

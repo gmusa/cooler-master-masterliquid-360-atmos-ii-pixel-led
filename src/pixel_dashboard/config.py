@@ -46,7 +46,8 @@ def _options(data, base):
     for key in ('duration', 'fps'):
         value = values[key]
         maximum = 100 if key == 'fps' else 3600
-        if type(value) not in (int, float) or not 0 < value <= maximum:
+        minimum = 0.01 if key == 'fps' else 0
+        if type(value) not in (int, float) or not minimum <= value <= maximum or value == 0:
             raise ConfigError(f'invalid {key}')
     value = values['brightness']
     if type(value) is not int or not 0 <= value <= 100:
